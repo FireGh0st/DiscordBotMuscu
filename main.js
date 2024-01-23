@@ -168,20 +168,20 @@ function addExo(name){
 // fonction d'ajout d'un record
 
 function addRecord(user, exo, score){
+  let res = false;
   if(records.has(user)){
     records.get(user)[exo] = score;
     console.log(`Record added for user ${user} : ${exo} ${score}`);
-    console.log(records.get(user));
   }
   else{
     let newrecords = {};
     newrecords[exo] = score;
     records.set(user, newrecords);
-    console.log(records);
-    console.log(`1Record added for user ${user} : ${exo} ${score}`);
+    console.log(`Record created for user ${user} : ${exo} ${score}`);
+    res = true;
   }
   saveRecords();
-  console.log(records);
+  return res;
 }
 
 // fonction de récupération des records
@@ -220,7 +220,19 @@ Client.on('ready', () => {
       guild.commands.create(command); // Create each command
     });
   });
-  console.log("Commands loaded");
+  Client.user.setPresence(
+    {
+      status: "dnd",
+      activities: [
+        {
+          name: "Pour toutes questions liées au RGPD, contactez: _fire_ghost_",
+          type: Discord.ActivityType.WATCHING
+        }
+      ]
+    }
+  );
+  
+
 });
 
 //faire en async avec une bdd a l'arrache c'est pas ouf
@@ -246,13 +258,15 @@ Client.on('interactionCreate', async interaction => {
   if (commandName === 'add') {
     const exo = options.getString('exo');
     var score = options.getInteger('poids');
-    console.log(exo);
     //si l'unité est lbs, on convertit en kg
     if(options.getString('unité') === 'lbs'){
       score = Math.round(score/2.2046);
     }
-    addRecord(interaction.user.id, exo, score);
-    await interaction.reply(`Record ajouté : ${exo} ${score}`);
+    let RGPD = "";
+    if(addRecord(interaction.user.id, exo, score)){
+      RGPD = "\nConformément au RGPD, vos données personnelles ont été collectées pour toutes demandes de consultation ou suppression de données, veuillez contacter le responsable du traitement des données à caractère personnel (DPO) sur discord : `_fire_ghost_`";
+    }
+    await interaction.reply(`Record ajouté : ${exo} ${score}${RGPD}`);
     return;
   }
 
@@ -302,7 +316,7 @@ Client.on('interactionCreate', async interaction => {
           const recordsPretty = (await Promise.all(
             Array.from(records.entries()).map(async ([id, value]) => {
               if (!/^\d+$/.test(id)) {
-                console.log(`Skipping invalid ID: ${id}`);
+                //console.log(`Skipping invalid ID: ${id}`);
                 return;
               }
               const user = await Client.users.fetch(id);
@@ -403,22 +417,25 @@ Client.on('interactionCreate', async interaction => {
 
     let longestExoLength = Math.max(...exerciseList.map(exo => exo.length));
 
+    let counter = 0;
     for (let [userId, userRecords] of recordsAll.entries()) {
       if (!/^\d+$/.test(userId)) {
-        console.log(`Skipping invalid ID: ${userId}`);
         continue;
       }
       const user = await Client.users.fetch(userId);
-      let value = exerciseList.map(exo => `${exo}: ${'\u2000'.repeat(longestExoLength - exo.length)}${userRecords[exo] || 'N/A'}`).join('\n');
+      let value = exerciseList.map(exo => `${exo}: ${'\u2000'.repeat(longestExoLength - exo.length+3)}${userRecords[exo] || 'N/A'}`).join('\n');
       embed.addFields({ name: `\`${user.username}\``, value: `\`\`\`${value}\`\`\``, inline: true});
+
+      counter++;
+      if (counter % 2 === 0) {
+        embed.addFields({ name: '\u200B', value: '\u200B', inline: true });
+      }
     }
 
     await interaction.reply({ embeds: [embed] });
 
     return;
-  }
    
-
+  }
 });
-console.log(discordApiKey)
 Client.login(discordApiKey);
